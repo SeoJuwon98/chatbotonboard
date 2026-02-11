@@ -1,3 +1,9 @@
+import InputArea from "@/components/chat/InputArea";
+
 export default function Home() {
-  return <div></div>;
+  return (
+    <div>
+      <InputArea />
+    </div>
+  );
 }

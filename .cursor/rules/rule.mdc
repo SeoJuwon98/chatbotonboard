@@ -1,0 +1,304 @@
+---
+alwaysApply: true
+---
+
+---
+alwaysApply: true
+---
+
+# Cursor Rules — Next.js App Router (Strict & Optimized)
+
+## 1. Core Philosophy
+
+- This project uses **Next.js App Router (v16)**.
+- **Server-first architecture** is mandatory.
+- **Colocation over abstraction**.
+- **Duplication is preferred over shared domain coupling**.
+- **Performance & Security** (Caching, Streaming, Boundaries) are first-class citizens.
+- Server Components are the default choice.
+
+---
+
+## 2. Folder Structure & Ownership
+
+### Route-Centric Rule
+
+- Every feature MUST live inside its **route directory**.
+- All files related to a feature MUST be colocated.
+
+### Allowed Global Directories (Strict)
+
+- `lib/infrastructure` → DB connection, Auth providers, Loggers (Infrastructure only).
+- `lib/domain` → **Pure business logic only** (calculations, parsers). NO JSX, NO React Hooks.
+- `components/ui/` → atomic UI primitives only (Button, Input).
+- `components/layout/` → global layout components only (Header, Sidebar).
+
+### Prohibited (Non-negotiable)
+
+- `features/`
+- `services/`
+- global `entities/`
+- shared domain-level folders (except `lib/domain` for pure functions)
+
+---
+
+## 3. Component Rules
+
+### Server Components (Default)
+
+- `"use client"` MUST NOT be present.
+- Server Components are **route-scoped**.
+- MUST NOT be reused across different domains.
+- MUST live inside the route directory.
+
+### Client Components
+
+- MUST include `"use client"`.
+- Filename MUST end with `*.client.tsx`.
+- Use ONLY when:
+  - React hooks are required
+  - Browser-only APIs are used
+  - Explicit user interaction exists
+- If unsure, default to **Server Component**.
+
+---
+
+## 4. Page Responsibility (Strict)
+
+### `page.tsx`
+
+- Acts as a **Composer only**.
+
+MUST:
+- Fetch data via `queries.ts`
+- Pass data via props or Promises to child components
+- **Avoid Waterfalls**: Do NOT `await` independent data fetches sequentially. Use `Promise.all` or pass promises directly.
+- Use `<Suspense>` boundaries for slow data parts.
+
+MUST NOT:
+- Access DB directly
+- Implement `fetch()` logic
+- Contain business logic
+- Perform mutations
+- Become a large UI component
+
+---
+
+## 5. Data Flow & Server Actions
+
+### Read Flow
+
+page.tsx → queries.ts → DB
+
+- `queries.ts`
+  - Server-only
+  - **Memoization**: MUST be wrapped in `import { cache } from 'react'` to dedup requests.
+  - **Security**: MUST include `import 'server-only'` at the top.
+  - Read-only & No mutations
+
+### Write Flow
+
+Client Component → actions.ts → DB
+
+- `actions.ts`
+  - Mutation only
+  - MUST include `"use server"`
+  - Acts as the BFF layer
+
+---
+
+## 6. Import Boundary Rules (Critical)
+
+### Client Components (`*.client.tsx`)
+
+MUST NOT import:
+- `queries.ts`
+- `lib/db`
+- server-only modules (`fs`, `path`, etc)
+
+CAN import:
+- `actions.ts`
+- `schema.ts`
+- `types.ts`
+
+### Server Actions
+
+- `"use server"` is allowed **only** in `actions.ts`.
+
+### `api.ts`
+
+- Client-side fetch wrapper only.
+- May call `/api/**` endpoints.
+- MUST NOT:
+  - Access DB
+  - Import `actions.ts`
+  - Contain business logic
+
+---
+
+## 7. Validation & Types
+
+### `schema.ts`
+
+- Zod schemas only.
+- Domain-isolated.
+- MUST NOT be shared across routes.
+- Duplicate instead of abstracting.
+
+### `types.ts`
+
+- Optional.
+- Route-scoped only.
+- No global domain types.
+
+---
+
+## 8. Reuse Policy (Non-Negotiable)
+
+- ❌ No shared Server Components across domains
+- ❌ No shared domain logic folders (except `lib/domain` for pure utils)
+- ❌ No cross-route imports for domain logic
+- ✅ Prefer duplication over abstraction
+
+---
+
+## 9. File Generation Template (Example: products)
+
+app/(dashboard)/products/
+
+├─ page.tsx             # Composer, Streaming setup
+├─ queries.ts           # Cached data fetchers (server-only)
+├─ actions.ts           # Server Actions (Mutations)
+├─ schema.ts            # Zod validation
+├─ components/
+│ ├─ ProductTable.tsx   # Server Component
+│ ├─ ProductRow.tsx     # Server Component
+│ └─ ProductForm.client.tsx # Client Component
+
+---
+
+## 10. Behavior Rules (AI Decision Control)
+
+### Server / Client Decision
+
+- Always assume **Server Component first**.
+- Add `"use client"` only when strictly required.
+
+### Data Fetching
+
+- Never fetch in Client Components by default.
+- Client fetch is allowed ONLY when interaction-driven.
+- If client fetch is used, explain why server fetch is impossible.
+
+### Mutations
+
+- All mutations MUST go through `actions.ts`.
+- Do NOT implement mutations inside components.
+
+### File Creation
+
+- Do NOT create new top-level folders unless explicitly requested.
+- Follow the provided file template exactly.
+
+### Conflict Handling
+
+- If requirements conflict with these rules:
+  - STOP
+  - Explain the conflict
+  - Ask for clarification
+  - Do NOT silently violate architecture
+
+---
+
+## 11. Decision Priority (When Unsure)
+
+1. **Security** (server-only, validation) > Convenience
+2. **Performance** (caching, streaming) > Simplicity
+3. **Server Component** > Client Component
+4. **Route-local** > Global
+5. **Duplicate** > Abstract
+
+---
+
+## 12. Library Version & Compatibility Rules (Strict)
+
+### Version Authority (Single Source of Truth)
+
+- The following files define the **only valid library versions**:
+  - `package.json`
+  - `pnpm-lock.yaml` / `package-lock.json` / `yarn.lock`
+- All code MUST be written to be compatible with the versions defined there.
+- Documentation examples MUST be adapted to the installed version.
+
+---
+
+### Prohibited Behaviors (Non-negotiable)
+
+Cursor MUST NOT:
+
+- Suggest upgrading or downgrading a library version
+- Suggest installing a different major/minor version
+- Use APIs introduced in newer versions than installed
+- Say or imply:
+  - “In newer versions…”
+  - “If you upgrade…”
+  - “This requires vX+”
+- Modify `package.json` or lock files unless explicitly requested
+
+Version changes are NEVER allowed implicitly.
+
+---
+
+### When an API Is Unavailable in Current Version
+
+If a requested implementation relies on an API NOT available in the installed version:
+
+Cursor MUST:
+
+1. Explicitly state:
+   - That the API is unavailable in the current version
+2. Provide:
+   - A compatible alternative implementation
+   - OR a graceful limitation explanation
+3. STOP after explaining the limitation
+
+Cursor MUST NOT:
+
+- Propose upgrading as a default solution
+- Bypass the limitation silently
+
+---
+
+### Documentation Usage Rule
+
+- Official documentation examples MUST be:
+  - Version-checked
+  - Adapted to the installed version
+- Copying examples from newer docs without adaptation is forbidden
+
+---
+
+### Explicit Upgrade Handling (Exception Rule)
+
+Only if the USER explicitly requests a version change:
+
+Cursor MAY:
+
+- Explain breaking changes
+- Explain migration cost
+- Explain architectural impact
+
+Cursor MUST:
+
+- Clearly separate current-version solution vs upgraded solution
+- Never mix APIs from different versions in one answer
+
+---
+
+### Enforcement Priority
+
+When unsure about version compatibility:
+
+1. Assume the **installed version is fixed**
+2. Prefer older, stable APIs
+3. Ask for confirmation BEFORE suggesting upgrades

@@ -1,4 +1,5 @@
 import localFont from "next/font/local";
+import { QueryProvider } from "@/components/query-provider.client";
 import "./globals.css";
 
 const pretendard = localFont({
@@ -43,7 +44,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={pretendard.variable}>
-      <body className={`${pretendard.className} antialiased`}>{children}</body>
+      <body className={`${pretendard.className} antialiased`}>
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   );
 }

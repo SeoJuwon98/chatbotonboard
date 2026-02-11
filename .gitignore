@@ -10,11 +10,18 @@
 !.yarn/releases
 !.yarn/versions
 
-# Cursor 관련 설정 무시
-.cursor/
+# cursor 전체는 기본적으로 ignore
+.cursor/*
 
-# 하지만 규칙 파일은 버전 관리에 포함
+# cursor 디렉터리 자체는 추적 가능하게 복구
+!.cursor/
+
+# rules 디렉터리 복구
 !.cursor/rules/
+!.cursor/rules/**
+
+# 또는 특정 파일만
+!.cursor/rules/rule.mdc
 
 # testing
 /coverage

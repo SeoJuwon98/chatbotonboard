@@ -10,7 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+# Cursor 관련 설정 무시
 .cursor/
+
+# 하지만 규칙 파일은 버전 관리에 포함
+!.cursor/rules/
 
 # testing
 /coverage

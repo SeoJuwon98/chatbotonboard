@@ -1,5 +1,5 @@
 import localFont from "next/font/local";
-import { QueryProvider } from "@/components/query-provider.client";
+import { QueryProvider } from "@/app/providers/query-provider.client";
 import "./globals.css";
 
 const pretendard = localFont({

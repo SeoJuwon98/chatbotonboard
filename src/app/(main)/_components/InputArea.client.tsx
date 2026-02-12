@@ -21,23 +21,21 @@ import {
 } from "@/components/ui/combobox";
 import { CHAT_MODELS, VL_MODEL_IDS, type ChatModelId } from "@chatbot/shared";
 
-export { CHAT_MODELS, type ChatModelId };
-
 const MAX_IMAGES = 4;
 const ACCEPT_IMAGES = "image/*";
 
 interface InputAreaProps {
   placeholder?: string;
-  onSubmit?: (message: string, images?: File[]) => void;
+  // 변경: onSubmit이 텍스트와 이미지 배열을 인자로 받음
+  onSubmit: (message: string, images?: File[]) => void;
   className?: string;
   disabled?: boolean;
   isStreaming?: boolean;
   onStop?: () => void;
-  model?: ChatModelId;
-  onModelChange?: (model: ChatModelId) => void;
+  // 변경: model과 핸들러를 필수 혹은 부모 제어 방식으로 변경
+  model: ChatModelId;
+  onModelChange: (model: ChatModelId) => void;
 }
-
-const defaultModel: ChatModelId = "vllm-main";
 
 const InputArea = ({
   placeholder = "메시지를 입력하세요",
@@ -46,27 +44,26 @@ const InputArea = ({
   disabled = false,
   isStreaming = false,
   onStop,
-  model: controlledModel,
+  model,
   onModelChange,
 }: InputAreaProps) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [internalModel, setInternalModel] = useState<ChatModelId | null>(
-    defaultModel,
-  );
-  const model = controlledModel ?? internalModel ?? defaultModel;
-  const setModel = useCallback(
-    (v: ChatModelId | null) => {
-      const next = v ?? defaultModel;
-      onModelChange?.(next);
-      if (controlledModel == null) setInternalModel(next);
-      if (!VL_MODEL_IDS.includes(next)) setImages([]);
-    },
-    [controlledModel, onModelChange],
-  );
 
   const isVlModel = VL_MODEL_IDS.includes(model);
+
+  // 모델 변경 핸들러 (이미지 호환성 체크)
+  const handleModelChange = useCallback(
+    (next: ChatModelId) => {
+      onModelChange(next);
+      // VL 모델이 아니면 이미지 초기화
+      if (!VL_MODEL_IDS.includes(next)) {
+        setImages([]);
+      }
+    },
+    [onModelChange],
+  );
 
   const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -92,8 +89,13 @@ const InputArea = ({
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
-    onSubmit?.(trimmed, isVlModel && images.length > 0 ? images : undefined);
+    // 텍스트가 없어도 이미지가 있으면 전송 가능한 경우가 있으나, 보통 텍스트 필수 여부에 따라 조정
+    if ((!trimmed && images.length === 0) || disabled) return;
+
+    // 부모에게 데이터 전달
+    onSubmit(trimmed, isVlModel && images.length > 0 ? images : undefined);
+
+    // 상태 초기화
     setValue("");
     setImages([]);
   }, [value, onSubmit, disabled, isVlModel, images]);
@@ -108,7 +110,7 @@ const InputArea = ({
     [handleSubmit],
   );
 
-  const canSend = value.trim().length > 0 && !disabled;
+  const canSend = (value.trim().length > 0 || images.length > 0) && !disabled;
 
   return (
     <div
@@ -126,7 +128,8 @@ const InputArea = ({
         aria-hidden
         onChange={handleFileChange}
       />
-      {/* VL 모델 + 이미지 있을 때: 미리보기를 메시지 입력창 위에 표시 */}
+
+      {/* 이미지 미리보기 영역 */}
       {isVlModel && images.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {images.map((file, index) => (
@@ -145,28 +148,16 @@ const InputArea = ({
               <button
                 type="button"
                 onClick={() => removeImage(index)}
-                aria-label="이미지 제거"
                 className="absolute top-0.5 right-0.5 rounded-full p-0.5 bg-black/60 text-white hover:bg-black/80"
               >
                 <X className="size-3" />
               </button>
             </div>
           ))}
-          {images.length < MAX_IMAGES && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              className="size-14 shrink-0 rounded-lg border border-dashed border-gray-300 bg-gray-50/50 hover:border-gray-400 hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="이미지 추가"
-            >
-              <ImagePlus className="size-5" />
-            </button>
-          )}
         </div>
       )}
+
       <TextareaAutosize
-        id="textarea-message"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -175,28 +166,23 @@ const InputArea = ({
         minRows={1}
         maxRows={6}
         className={cn(
-          "flex w-full bg-transparent px-2 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-          "resize-none min-h-10",
-          "[&::-webkit-scrollbar]:w-2",
-          "[&::-webkit-scrollbar-track]:bg-transparent",
-          "[&::-webkit-scrollbar-thumb]:bg-gray-300",
-          "[&::-webkit-scrollbar-thumb]:rounded-full",
-          "[&::-webkit-scrollbar-thumb]:hover:bg-gray-400",
+          "flex w-full bg-transparent px-2 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 resize-none min-h-10",
         )}
       />
+
       <div className="flex flex-wrap items-center w-full px-1 gap-2 min-h-9">
         <Combobox
           value={model}
-          onValueChange={(v) => setModel(v as ChatModelId | null)}
+          onValueChange={(v) => handleModelChange(v as ChatModelId)}
         >
           <ComboboxInput
             disabled={disabled}
             showClear={false}
             placeholder="모델 선택"
             readOnly
-            className="h-8 min-w-0 max-w-[140px] sm:max-w-[220px] border-gray-200 text-sm cursor-pointer shrink-0 truncate"
+            className="h-8 min-w-0 max-w-[140px] border-gray-200 text-sm cursor-pointer shrink-0 truncate"
           />
-          <ComboboxContent side="top" sideOffset={6}>
+          <ComboboxContent side="top">
             <ComboboxList>
               {CHAT_MODELS.map((modelId) => (
                 <ComboboxItem key={modelId} value={modelId}>
@@ -206,29 +192,26 @@ const InputArea = ({
             </ComboboxList>
           </ComboboxContent>
         </Combobox>
-        {/* VL 모델일 때: 같은 줄에는 "이미지 첨부" 버튼만 (미리보기는 입력창 위로 올림) */}
-        <div className="flex-1 flex items-center gap-2 min-w-0 basis-0 sm:basis-auto">
+
+        <div className="flex-1 flex items-center gap-2">
           {isVlModel && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="h-8 rounded-lg border border-dashed border-gray-300 bg-gray-50/50 hover:border-gray-400 hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1.5 px-2 sm:px-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0 min-w-0"
-              aria-label="이미지를 첨부하여 질문하기"
+              className="h-8 rounded-lg border border-dashed border-gray-300 bg-gray-50/50 hover:bg-gray-100 text-gray-500 flex items-center gap-1.5 px-3 text-sm"
             >
-              <ImagePlus className="size-4 shrink-0" />
-              <span className="hidden sm:inline whitespace-nowrap">
-                이미지 첨부
-              </span>
+              <ImagePlus className="size-4" />
+              <span className="hidden sm:inline">이미지 첨부</span>
             </button>
           )}
         </div>
+
         {isStreaming ? (
           <button
             type="button"
             onClick={onStop}
-            aria-label="응답 중지"
-            className="rounded-full p-2.5 transition-colors shrink-0 bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+            className="rounded-full p-2.5 bg-red-500 text-white hover:bg-red-600"
           >
             <Square className="size-4" />
           </button>
@@ -237,11 +220,10 @@ const InputArea = ({
             type="button"
             onClick={handleSubmit}
             disabled={!canSend}
-            aria-label="메시지 전송"
             className={cn(
-              "rounded-full p-2.5 transition-colors shrink-0",
+              "rounded-full p-2.5 transition-colors",
               canSend
-                ? "bg-black text-white hover:bg-black/80 cursor-pointer"
+                ? "bg-black text-white hover:bg-black/80"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed",
             )}
           >

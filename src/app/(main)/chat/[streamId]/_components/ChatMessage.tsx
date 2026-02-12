@@ -1,83 +1,110 @@
 "use client";
 
-import { useState } from "react";
+import { type UIMessage } from "ai";
 import { cn } from "@/lib/utils";
-import { ChevronDown, BrainCircuit } from "lucide-react";
-import type { DisplayMessage } from "../_lib/message-utils";
+import { Bot, User, BrainCircuit } from "lucide-react"; // 아이콘 필요 시 추가
+// import ReactMarkdown from "react-markdown"; // 마크다운 렌더링 라이브러리 사용 권장
 
 interface ChatMessageProps {
-  message: DisplayMessage;
+  message: UIMessage;
 }
 
-function ChatMessage({ message }: ChatMessageProps) {
+export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
-  const [reasoningOpen, setReasoningOpen] = useState(false);
 
   return (
     <div
-      className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}
+      className={cn(
+        "flex w-full gap-4",
+        isUser ? "flex-row-reverse" : "flex-row",
+      )}
     >
+      {/* 아바타 영역 */}
       <div
-        className={cn("max-w-[85%] flex flex-col gap-2", isUser && "items-end")}
+        className={cn(
+          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-xs",
+          isUser ? "bg-black" : "bg-emerald-600",
+        )}
       >
-        {/* User 메시지에 첨부된 이미지 */}
-        {isUser && message.images && message.images.length > 0 && (
-          <div className="flex gap-2 flex-wrap justify-end">
-            {message.images.map((img, i) => (
-              <div
-                key={i}
-                className="rounded-lg overflow-hidden border border-gray-200 size-16 shrink-0"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`data:${img.mimeType};base64,${img.base64}`}
-                  alt=""
-                  className="size-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+      </div>
 
-        {/* Assistant reasoning (생각 과정) — DB에서 불러온 완료된 것 */}
-        {!isUser && message.reasoningContent && (
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setReasoningOpen((v) => !v)}
-              className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-500 hover:bg-gray-100 transition-colors"
-            >
-              <BrainCircuit className="size-3.5 shrink-0" />
-              <span className="font-medium">생각 과정</span>
-              <ChevronDown
-                className={cn(
-                  "size-3.5 ml-auto transition-transform",
-                  reasoningOpen && "rotate-180",
-                )}
-              />
-            </button>
-            {reasoningOpen && (
-              <div className="px-4 pb-3 text-xs text-gray-500 leading-relaxed whitespace-pre-wrap border-t border-gray-200 pt-2">
-                {message.reasoningContent}
-              </div>
-            )}
-          </div>
+      {/* 메시지 내용 영역 */}
+      <div
+        className={cn(
+          "flex flex-col gap-2 max-w-[85%] text-sm leading-relaxed",
+          isUser ? "items-end" : "items-start",
         )}
+      >
+        {/* 사용자 이름 */}
+        <span className="text-gray-500 text-xs font-medium">
+          {isUser ? "User" : "AI"}
+        </span>
 
-        {/* 메시지 본문 */}
+        {/* 메시지 파트 렌더링 */}
         <div
           className={cn(
-            "rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap",
+            "rounded-2xl px-4 py-2.5 shadow-sm break-words whitespace-pre-wrap",
             isUser
-              ? "bg-black text-white rounded-br-sm"
-              : "bg-gray-100 text-gray-900 rounded-bl-sm",
+              ? "bg-black text-white rounded-tr-none"
+              : "bg-white border border-gray-100 rounded-tl-none",
           )}
         >
-          {message.content}
+          {message.parts.map((part, index) => {
+            // 1. 텍스트 렌더링
+            if (part.type === "text") {
+              return (
+                <div key={index} className="markdown-body">
+                  {/* ReactMarkdown 등을 사용하면 더 좋습니다 */}
+                  {part.text}
+                </div>
+              );
+            }
+
+            // 2. 추론 과정(Reasoning) 렌더링
+            if (part.type === "reasoning") {
+              return (
+                <details
+                  key={index}
+                  open
+                  className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
+                >
+                  <summary className="flex cursor-pointer items-center gap-1 font-semibold text-amber-700 select-none">
+                    <BrainCircuit className="h-3 w-3" />
+                    추론 과정 (Reasoning)
+                  </summary>
+                  <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-600 font-mono">
+                    {part.text}
+                  </pre>
+                </details>
+              );
+            }
+
+            // 3. 이미지 렌더링 (사용자가 보낸 이미지)
+            if (part.type === "image") {
+              // file 타입이나 image 타입으로 들어올 수 있음 (SDK 버전에 따라 다름)
+              // 여기서는 이미 변환된 url을 사용
+              const imgUrl = "image" in part ? part.image : (part as any).url;
+
+              return (
+                <div
+                  key={index}
+                  className="mt-2 mb-2 rounded-lg overflow-hidden border border-gray-200 max-w-sm"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imgUrl}
+                    alt="User uploaded"
+                    className="w-full h-auto object-cover"
+                  />
+                </div>
+              );
+            }
+
+            return null;
+          })}
         </div>
       </div>
     </div>
   );
 }
-
-export default ChatMessage;

@@ -44,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={pretendard.variable}>
-      <body className={`${pretendard.className} antialiased`}>
+      <body className={`${pretendard.className} antialiased overflow-x-hidden`}>
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

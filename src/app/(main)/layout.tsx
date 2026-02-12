@@ -1,6 +1,6 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import MainSidebar, { ChatSession } from "./_components/MainSidebar";
-import Header from "./_components/Header";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import MainSidebar, { ChatSession } from "./_components/MainSidebar.client";
+import Header from "./_components/Header.client";
 
 const chatList: ChatSession[] = [
   {
@@ -27,11 +27,11 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         } as React.CSSProperties
       }
     >
-      <div className="flex flex-col h-screen w-screen">
+      <div className="flex flex-col h-screen w-full max-w-full overflow-x-hidden">
         <Header />
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 min-w-0">
           <MainSidebar chatList={chatList} />
-          <main className="flex-1 flex flex-col min-w-0">{children}</main>
+          <main className="flex-1 flex flex-col min-w-0 overflow-x-hidden">{children}</main>
         </div>
       </div>
     </SidebarProvider>

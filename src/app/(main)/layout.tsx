@@ -1,5 +1,6 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import MainSidebar, { ChatSession } from "./_components/MainSidebar";
+import Header from "./_components/Header";
 
 const chatList: ChatSession[] = [
   {
@@ -15,12 +16,23 @@ const chatList: ChatSession[] = [
     streamId: "2",
   },
 ];
+const HEADER_HEIGHT = "3rem";
+
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider>
-      <div className="flex flex-1 h-screen w-screen">
-        <MainSidebar chatList={chatList} />
-        <main className="flex-1 pt-12">{children}</main>
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-top-offset": HEADER_HEIGHT,
+        } as React.CSSProperties
+      }
+    >
+      <div className="flex flex-col h-screen w-screen">
+        <Header />
+        <div className="flex flex-1 min-h-0">
+          <MainSidebar chatList={chatList} />
+          <main className="flex-1 flex flex-col min-w-0">{children}</main>
+        </div>
       </div>
     </SidebarProvider>
   );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus } from "lucide-react"; // 아이콘 추가
+import { Plus } from "lucide-react";
 
 import {
   Sidebar,
@@ -17,6 +17,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface ChatSession {
   createdAt: string;
@@ -31,13 +32,16 @@ interface MainSidebarProps {
 
 const MainSidebar = ({ chatList }: MainSidebarProps) => {
   const pathname = usePathname();
+  const isMobile = useIsMobile();
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="flex flex-col py-4">
-        <div className="flex items-center">
-          <SidebarTrigger className="stroke-1 size-8" />
-        </div>
+      <SidebarHeader className="flex flex-col py-2">
+        {isMobile && (
+          <div className="flex items-center">
+            <SidebarTrigger className="stroke-1 size-8" />
+          </div>
+        )}
         <SidebarMenu className="py-1">
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -55,7 +59,6 @@ const MainSidebar = ({ chatList }: MainSidebarProps) => {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          {" "}
           <SidebarGroupLabel className="whitespace-nowrap">
             내 채팅
           </SidebarGroupLabel>

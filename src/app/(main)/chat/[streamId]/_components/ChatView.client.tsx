@@ -31,6 +31,9 @@ export default function ChatView({ streamId, initialMessages }: ChatViewProps) {
     }),
     // 1. 쓰로틀링: 50ms마다 UI 업데이트 (성능 최적화)
     experimental_throttle: 50,
+    // 0. 서버에서 받은 initialMessages 를 초기 메시지로 세팅
+    //    -> 히스토리가 먼저 보이고 그 다음부터 대화 시작
+    initialMessages: initialMessages as any,
     // 2. 선택된 모델 정보를 API로 전달 (동적 바디)
     body: {
       modelId: model,

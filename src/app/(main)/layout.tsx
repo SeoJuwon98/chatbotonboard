@@ -6,7 +6,12 @@ import { sessionsApi } from "@/lib/api";
 const HEADER_HEIGHT = "3rem";
 
 const MainLayout = async ({ children }: { children: React.ReactNode }) => {
-  let chatList: { createdAt: string; updatedAt: string; title: string; streamId: string }[] = [];
+  let chatList: {
+    createdAt: string;
+    updatedAt: string;
+    title: string;
+    streamId: string;
+  }[] = [];
 
   try {
     const sessions = await sessionsApi.list();

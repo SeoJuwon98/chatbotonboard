@@ -14,6 +14,7 @@ const ChatStreamPage = async ({ params }: ChatStreamPageProps) => {
 
   try {
     initialMessages = await messagesApi.list(streamId);
+    console.log(initialMessages);
   } catch {
     // 세션이 존재하지 않으면 404
     notFound();

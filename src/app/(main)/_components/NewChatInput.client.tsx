@@ -3,9 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import InputArea from "./InputArea.client";
-import { sessionsApi, messagesApi } from "@/lib/api";
-import { useChatStreamStore } from "../_stores/chat-stream";
-import type { ImageAttachment } from "@chatbot/shared";
+import { createChat } from "../actions";
+import type { ChatModelId, ImageAttachment } from "@chatbot/shared";
 
 const SUGGESTIONS = [
   "비트코인 시세 분석해줘",
@@ -16,7 +15,7 @@ const SUGGESTIONS = [
 
 function NewChatInput() {
   const router = useRouter();
-  const { model, setModel } = useChatStreamStore();
+  const [model, setModel] = useState<ChatModelId>("vllm-main");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = useCallback(
@@ -42,28 +41,14 @@ function NewChatInput() {
           );
         }
 
-        // 1. 세션 생성
-        const streamId = crypto.randomUUID();
-        await sessionsApi.create({
-          id: streamId,
-          model,
-        });
-
-        // 2. user 메시지 저장
-        await messagesApi.create(streamId, {
-          role: "user",
-          content: message,
-          images: images ?? null,
-        });
-
-        // 3. 채팅 페이지로 이동 (ChatView에서 자동으로 스트리밍 시작)
-        router.push(`/chat/${streamId}`);
+        const id = await createChat(); // 서버 액션으로 새로운 채팅 생성
+        router.push(`/chat/${id}`);
       } catch (error) {
         console.error("새 채팅 생성 실패:", error);
         setIsSubmitting(false);
       }
     },
-    [model, router, isSubmitting],
+    [isSubmitting, router],
   );
 
   const handleSuggestion = useCallback(

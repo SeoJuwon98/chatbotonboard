@@ -10,9 +10,9 @@
     "start": "next start",
     "lint": "eslint"
   },
-"dependencies": {
-      "@ai-sdk/react": "^3.0.79",
-      "@ai-sdk/openai": "^3.0.27",
+  "dependencies": {
+    "@ai-sdk/react": "^3.0.79",
+    "@ai-sdk/openai": "^3.0.27",
     "@base-ui/react": "^1.1.0",
     "@chatbot/shared": "workspace:*",
     "@tanstack/react-query": "^5.90.20",

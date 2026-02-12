@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    "**/.pnpm-store": true,
+    ".pnpm-store": true
+  }
+}

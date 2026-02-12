@@ -1,9 +1,17 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import InputArea from "../../../_components/InputArea.client";
 import ChatMessage from "./ChatMessage";
-import type { Message } from "../types";
+import StreamingMessage from "./StreamingMessage.client";
+import ChatError from "./ChatError.client";
+import type { Message, ChatModelId } from "../types";
+import { useChatStreamStore } from "../../../_stores/chat-stream";
+import { messagesApi, chatStreamApi } from "@/lib/api";
+import type {
+  OpenAIChatMessage,
+  ImageAttachment,
+} from "@chatbot/shared";
 
 interface ChatViewProps {
   streamId: string;
@@ -11,9 +19,32 @@ interface ChatViewProps {
 }
 
 function ChatView({ streamId, initialMessages }: ChatViewProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const {
+    isStreaming,
+    streamingStreamId,
+    partialContent,
+    reasoningContent,
+    error,
+    model,
+    startStream,
+    handleEvent,
+    completeStream,
+    stopStream,
+    setError,
+    reset,
+    setModel,
+  } = useChatStreamStore();
+
+  // 현재 스트림에 해당하는 스트리밍인지 확인
+  const isCurrentStream = streamingStreamId === streamId && isStreaming;
+
+  // 메시지는 서버에서 받은 initialMessages 사용 (페이지 진입 시 SSR fetch)
+  // 새 메시지 추가 후에는 router.refresh()로 서버 데이터 다시 가져옴
+  const messages = initialMessages;
+
+  // 자동 스크롤
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -21,28 +52,149 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
         behavior: "smooth",
       });
     }
-  }, [messages]);
+  }, [messages, partialContent, reasoningContent]);
 
-  const handleSubmit = useCallback((message: string, images?: File[]) => {
-    void images; // VL 모델 이미지 첨부 시 백엔드 연동 후 사용
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: message,
-    };
-    setMessages((prev) => [...prev, userMessage]);
+  // 스트리밍 시작 로직
+  const startChatStream = useCallback(
+    async (
+      allMessages: OpenAIChatMessage[],
+    ) => {
+      const controller = startStream(streamId);
 
-    // Mock assistant response after a short delay
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content:
-          "현재 UI 프로토타입 모드입니다. 실제 응답은 백엔드 연동 후 제공됩니다.",
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-    }, 800);
-  }, []);
+      try {
+        await chatStreamApi.stream(
+          { model, messages: allMessages },
+          {
+            signal: controller.signal,
+            onEvent: (event) => {
+              handleEvent(event);
+              if (event.type === "done") {
+                // completeStream은 아래 finally/then에서 처리
+              }
+            },
+          },
+        );
+
+        // 스트리밍 완료 — assistant 메시지 DB 저장
+        const result = completeStream();
+        if (result.content) {
+          await messagesApi.create(streamId, {
+            role: "assistant",
+            content: result.content,
+            reasoningContent: result.reasoningContent,
+          });
+        }
+      } catch (err) {
+        if (controller.signal.aborted) {
+          // 사용자가 중지한 경우 — 현재까지 내용 저장
+          const result = completeStream();
+          if (result.content) {
+            await messagesApi.create(streamId, {
+              role: "assistant",
+              content: result.content + "\n\n_(응답이 중단되었습니다)_",
+              reasoningContent: result.reasoningContent,
+            });
+          }
+          return;
+        }
+        const message =
+          err instanceof Error ? err.message : "스트리밍 중 오류 발생";
+        setError(message);
+      }
+    },
+    [streamId, model, startStream, handleEvent, completeStream, setError],
+  );
+
+  // 메시지 전송
+  const handleSubmit = useCallback(
+    async (text: string, imageFiles?: File[]) => {
+      // 이미지를 base64로 변환
+      let images: ImageAttachment[] | undefined;
+      if (imageFiles && imageFiles.length > 0) {
+        images = await Promise.all(
+          imageFiles.map(async (file) => {
+            const buffer = await file.arrayBuffer();
+            const base64 = btoa(
+              new Uint8Array(buffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte),
+                "",
+              ),
+            );
+            return { base64, mimeType: file.type };
+          }),
+        );
+      }
+
+      // 1. user 메시지 즉시 DB 저장
+      await messagesApi.create(streamId, {
+        role: "user",
+        content: text,
+        images: images ?? null,
+      });
+
+      // 2. OpenAI 포맷 메시지 배열 구성
+      const openaiMessages: OpenAIChatMessage[] = [
+        ...messages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+      ];
+
+      // 현재 메시지 추가 (이미지 포함 시 멀티파트 포맷)
+      if (images && images.length > 0) {
+        openaiMessages.push({
+          role: "user",
+          content: [
+            { type: "text", text },
+            ...images.map((img) => ({
+              type: "image_url" as const,
+              image_url: {
+                url: `data:${img.mimeType};base64,${img.base64}`,
+              },
+            })),
+          ],
+        });
+      } else {
+        openaiMessages.push({ role: "user", content: text });
+      }
+
+      // 3. 스트리밍 시작
+      await startChatStream(openaiMessages);
+    },
+    [streamId, messages, startChatStream],
+  );
+
+  // 재시도
+  const handleRetry = useCallback(() => {
+    reset();
+    // 마지막 user 메시지를 찾아서 다시 전송
+    const lastUserMsg = [...messages]
+      .reverse()
+      .find((m) => m.role === "user");
+    if (lastUserMsg) {
+      const openaiMessages: OpenAIChatMessage[] = messages
+        .filter((m) => m !== lastUserMsg)
+        .map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }));
+      openaiMessages.push({ role: "user", content: lastUserMsg.content });
+      startChatStream(openaiMessages);
+    }
+  }, [messages, reset, startChatStream]);
+
+  // 중지
+  const handleStop = useCallback(() => {
+    stopStream();
+  }, [stopStream]);
+
+  // 모델 변경
+  const handleModelChange = useCallback(
+    (m: ChatModelId) => {
+      setModel(m);
+    },
+    [setModel],
+  );
 
   return (
     <div
@@ -58,6 +210,18 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
           {messages.map((message) => (
             <ChatMessage key={message.id} message={message} />
           ))}
+          {/* 스트리밍 중인 assistant 응답 */}
+          {isCurrentStream && (partialContent || reasoningContent) && (
+            <StreamingMessage
+              content={partialContent}
+              reasoningContent={reasoningContent}
+              isStreaming={isStreaming}
+            />
+          )}
+          {/* 에러 표시 */}
+          {error && !isStreaming && (
+            <ChatError message={error} onRetry={handleRetry} />
+          )}
         </div>
       </div>
 
@@ -67,6 +231,11 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
           <InputArea
             placeholder="메시지를 입력하세요..."
             onSubmit={handleSubmit}
+            disabled={isCurrentStream}
+            isStreaming={isCurrentStream}
+            onStop={handleStop}
+            model={model}
+            onModelChange={handleModelChange}
           />
         </div>
       </div>

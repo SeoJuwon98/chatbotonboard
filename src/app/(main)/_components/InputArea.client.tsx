@@ -10,7 +10,7 @@ import {
 } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { cn } from "@/lib/utils";
-import { SendHorizontal, ImagePlus, X } from "lucide-react";
+import { SendHorizontal, Square, ImagePlus, X } from "lucide-react";
 import {
   Combobox,
   ComboboxInput,
@@ -18,14 +18,13 @@ import {
   ComboboxList,
   ComboboxItem,
 } from "@/components/ui/combobox";
-import Image from "next/image";
+import {
+  CHAT_MODELS,
+  VL_MODEL_IDS,
+  type ChatModelId,
+} from "@chatbot/shared";
 
-export const CHAT_MODELS = ["GPT-OSS-120B", "QWEN3-VL-8B-INSTRUCT"] as const;
-
-export type ChatModelId = (typeof CHAT_MODELS)[number];
-
-/** Vision-Language 모델(Qwen): 이미지 첨부 UI 표시 */
-const VL_MODEL_IDS: ChatModelId[] = ["QWEN3-VL-8B-INSTRUCT"];
+export { CHAT_MODELS, type ChatModelId };
 
 const MAX_IMAGES = 4;
 const ACCEPT_IMAGES = "image/*";
@@ -35,6 +34,8 @@ interface InputAreaProps {
   onSubmit?: (message: string, images?: File[]) => void;
   className?: string;
   disabled?: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
   model?: ChatModelId;
   onModelChange?: (model: ChatModelId) => void;
 }
@@ -46,6 +47,8 @@ const InputArea = ({
   onSubmit,
   className,
   disabled = false,
+  isStreaming = false,
+  onStop,
   model: controlledModel,
   onModelChange,
 }: InputAreaProps) => {
@@ -137,10 +140,9 @@ const InputArea = ({
               className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50 size-14 shrink-0"
             >
               {imageUrls[index] && (
-                <Image
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
                   src={imageUrls[index]}
-                  width={56}
-                  height={56}
                   alt=""
                   className="size-full object-cover"
                 />
@@ -201,9 +203,9 @@ const InputArea = ({
           />
           <ComboboxContent side="top" sideOffset={6}>
             <ComboboxList>
-              {CHAT_MODELS.map((id) => (
-                <ComboboxItem key={id} value={id}>
-                  {id}
+              {CHAT_MODELS.map((modelId) => (
+                <ComboboxItem key={modelId} value={modelId}>
+                  {modelId}
                 </ComboboxItem>
               ))}
             </ComboboxList>
@@ -226,20 +228,31 @@ const InputArea = ({
             </button>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSend}
-          aria-label="메시지 전송"
-          className={cn(
-            "rounded-full p-2.5 transition-colors shrink-0",
-            canSend
-              ? "bg-black text-white hover:bg-black/80 cursor-pointer"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed",
-          )}
-        >
-          <SendHorizontal className="size-4" />
-        </button>
+        {isStreaming ? (
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label="응답 중지"
+            className="rounded-full p-2.5 transition-colors shrink-0 bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+          >
+            <Square className="size-4" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSend}
+            aria-label="메시지 전송"
+            className={cn(
+              "rounded-full p-2.5 transition-colors shrink-0",
+              canSend
+                ? "bg-black text-white hover:bg-black/80 cursor-pointer"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed",
+            )}
+          >
+            <SendHorizontal className="size-4" />
+          </button>
+        )}
       </div>
     </div>
   );

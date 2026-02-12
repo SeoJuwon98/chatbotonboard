@@ -1,24 +1,25 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
-import MainSidebar, { ChatSession } from "./_components/MainSidebar.client";
+import MainSidebar from "./_components/MainSidebar.client";
 import Header from "./_components/Header.client";
+import { sessionsApi } from "@/lib/api";
 
-const chatList: ChatSession[] = [
-  {
-    createdAt: "2026-02-11",
-    updatedAt: "2026-02-11",
-    title: "Chat 122    dashat 122    dashat 122    dashat 122    das",
-    streamId: "1",
-  },
-  {
-    createdAt: "2026-02-11",
-    updatedAt: "2026-02-11",
-    title: "Chat 2",
-    streamId: "2",
-  },
-];
 const HEADER_HEIGHT = "3rem";
 
-const MainLayout = ({ children }: { children: React.ReactNode }) => {
+const MainLayout = async ({ children }: { children: React.ReactNode }) => {
+  let chatList: { createdAt: string; updatedAt: string; title: string; streamId: string }[] = [];
+
+  try {
+    const sessions = await sessionsApi.list();
+    chatList = sessions.map((s) => ({
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      title: s.title,
+      streamId: s.id,
+    }));
+  } catch {
+    // 백엔드 미접속 시 빈 목록
+  }
+
   return (
     <SidebarProvider
       style={
@@ -31,7 +32,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         <Header />
         <div className="flex flex-1 min-h-0 min-w-0">
           <MainSidebar chatList={chatList} />
-          <main className="flex-1 flex flex-col min-w-0 overflow-x-hidden">{children}</main>
+          <main className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+            {children}
+          </main>
         </div>
       </div>
     </SidebarProvider>

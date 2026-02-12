@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import { prisma } from "../lib/db.js";
 import type {
   CreateSessionRequest,
@@ -6,7 +6,7 @@ import type {
   ChatModelId,
 } from "@chatbot/shared";
 
-export const sessionsRouter = Router();
+export const sessionsRouter: IRouter = Router();
 
 /** GET /sessions — 채팅 목록 (최신순) */
 sessionsRouter.get("/", async (_req, res) => {

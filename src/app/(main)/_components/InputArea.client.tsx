@@ -5,6 +5,7 @@ import {
   useCallback,
   useRef,
   useEffect,
+  useMemo,
   type KeyboardEvent,
   type ChangeEvent,
 } from "react";
@@ -18,11 +19,7 @@ import {
   ComboboxList,
   ComboboxItem,
 } from "@/components/ui/combobox";
-import {
-  CHAT_MODELS,
-  VL_MODEL_IDS,
-  type ChatModelId,
-} from "@chatbot/shared";
+import { CHAT_MODELS, VL_MODEL_IDS, type ChatModelId } from "@chatbot/shared";
 
 export { CHAT_MODELS, type ChatModelId };
 
@@ -85,15 +82,13 @@ const InputArea = ({
     setImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const imageUrls = useMemo(
+    () => images.map((f) => URL.createObjectURL(f)),
+    [images],
+  );
   useEffect(() => {
-    const urls = images.map((f) => URL.createObjectURL(f));
-    setImageUrls((prev) => {
-      prev.forEach((u) => URL.revokeObjectURL(u));
-      return urls;
-    });
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [images]);
+    return () => imageUrls.forEach((u) => URL.revokeObjectURL(u));
+  }, [imageUrls]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();

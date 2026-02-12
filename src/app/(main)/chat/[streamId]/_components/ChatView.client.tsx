@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import InputArea from "../../../_components/InputArea.client";
 import ChatMessage from "./ChatMessage";
 import StreamingMessage from "./StreamingMessage.client";
@@ -19,6 +20,7 @@ interface ChatViewProps {
 }
 
 function ChatView({ streamId, initialMessages }: ChatViewProps) {
+  const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -84,6 +86,7 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
             reasoningContent: result.reasoningContent,
           });
         }
+        router.refresh();
       } catch (err) {
         if (controller.signal.aborted) {
           // 사용자가 중지한 경우 — 현재까지 내용 저장
@@ -95,6 +98,7 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
               reasoningContent: result.reasoningContent,
             });
           }
+          router.refresh();
           return;
         }
         const message =
@@ -102,8 +106,29 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
         setError(message);
       }
     },
-    [streamId, model, startStream, handleEvent, completeStream, setError],
+    [streamId, model, startStream, handleEvent, completeStream, setError, router],
   );
+
+  // 첫 진입 시: 마지막 메시지가 user면 자동으로 스트리밍 시작 (NewChatInput에서 넘어온 경우)
+  const hasAutoStartedRef = useRef(false);
+  useEffect(() => {
+    hasAutoStartedRef.current = false;
+  }, [streamId]);
+  useEffect(() => {
+    if (
+      messages.length === 0 ||
+      messages[messages.length - 1].role !== "user" ||
+      isStreaming ||
+      hasAutoStartedRef.current
+    )
+      return;
+    hasAutoStartedRef.current = true;
+    const openaiMessages: OpenAIChatMessage[] = messages.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+    startChatStream(openaiMessages);
+  }, [messages, isStreaming, startChatStream, streamId]);
 
   // 메시지 전송
   const handleSubmit = useCallback(
@@ -131,6 +156,7 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
         content: text,
         images: images ?? null,
       });
+      router.refresh();
 
       // 2. OpenAI 포맷 메시지 배열 구성
       const openaiMessages: OpenAIChatMessage[] = [
@@ -161,7 +187,7 @@ function ChatView({ streamId, initialMessages }: ChatViewProps) {
       // 3. 스트리밍 시작
       await startChatStream(openaiMessages);
     },
-    [streamId, messages, startChatStream],
+    [streamId, messages, startChatStream, router],
   );
 
   // 재시도

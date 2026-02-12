@@ -88,12 +88,24 @@ export const messagesApi = {
   },
 };
 
-// ─── Chat Stream ───
+// ─── Chat Stream (OpenAI-compatible API) ───
+
+/** OpenAI 스트리밍 청크 형식 */
+interface OpenAIChunk {
+  id?: string;
+  object?: string;
+  choices?: Array<{
+    index?: number;
+    delta?: { content?: string; reasoning_content?: string; role?: string };
+    finish_reason?: string | null;
+  }>;
+  error?: { message: string; type?: string };
+}
 
 export const chatStreamApi = {
   /**
-   * LLM 스트리밍 요청. SSE 이벤트를 파싱하여 콜백으로 전달.
-   * ReadableStream 기반으로 실시간 처리.
+   * OpenAI 호환 /v1/chat/completions 스트리밍 요청.
+   * SSE를 파싱해 OpenAI 청크를 StreamEvent로 변환하여 콜백으로 전달.
    */
   async stream(
     data: ChatStreamRequest,
@@ -103,10 +115,14 @@ export const chatStreamApi = {
     },
   ): Promise<void> {
     const base = getBaseUrl();
-    const res = await fetch(`${base}/chat/stream`, {
+    const res = await fetch(`${base}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        model: data.model,
+        messages: data.messages,
+        stream: true,
+      }),
       signal: options.signal,
     });
 
@@ -137,13 +153,37 @@ export const chatStreamApi = {
         if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
         const jsonStr = trimmed.slice(6);
+        if (jsonStr === "[DONE]") {
+          options.onEvent({ type: "done" });
+          continue;
+        }
+
         try {
-          const event = JSON.parse(jsonStr) as StreamEvent;
-          options.onEvent(event);
+          const chunk = JSON.parse(jsonStr) as OpenAIChunk;
+
+          if (chunk.error) {
+            options.onEvent({ type: "error", message: chunk.error.message });
+            options.onEvent({ type: "done" });
+            return;
+          }
+
+          const choice = chunk.choices?.[0];
+          const delta = choice?.delta;
+          if (delta?.reasoning_content) {
+            options.onEvent({
+              type: "reasoning_delta",
+              delta: delta.reasoning_content,
+            });
+          }
+          if (delta?.content) {
+            options.onEvent({ type: "content_delta", delta: delta.content });
+          }
         } catch {
           // 파싱 실패 시 무시
         }
       }
     }
+
+    options.onEvent({ type: "done" });
   },
 };

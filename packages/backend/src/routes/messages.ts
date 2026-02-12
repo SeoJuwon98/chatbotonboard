@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import { prisma } from "../lib/db.js";
 import type {
   CreateMessageRequest,
@@ -6,7 +6,7 @@ import type {
   ImageAttachment,
 } from "@chatbot/shared";
 
-export const messagesRouter = Router();
+export const messagesRouter: IRouter = Router();
 
 /** GET /chat/:streamId/messages — 메시지 목록 조회 */
 messagesRouter.get("/:streamId/messages", async (req, res) => {

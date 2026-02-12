@@ -22,10 +22,7 @@ function getBaseUrl(): string {
   return "/api";
 }
 
-async function fetchJSON<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const base = getBaseUrl();
   const res = await fetch(`${base}${path}`, {
     ...init,
@@ -78,13 +75,10 @@ export const messagesApi = {
     streamId: string,
     data: CreateMessageRequest,
   ): Promise<CreateMessageResponse> {
-    return fetchJSON<CreateMessageResponse>(
-      `/chat/${streamId}/messages`,
-      {
-        method: "POST",
-        body: JSON.stringify(data),
-      },
-    );
+    return fetchJSON<CreateMessageResponse>(`/chat/${streamId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   },
 };
 
@@ -106,6 +100,10 @@ export const chatStreamApi = {
   /**
    * OpenAI 호환 /v1/chat/completions 스트리밍 요청.
    * SSE를 파싱해 OpenAI 청크를 StreamEvent로 변환하여 콜백으로 전달.
+   *
+   * ⚠️ SSE 스트리밍은 Next.js 프록시(rewrites / Route Handler)를 거치면
+   *    버퍼링되어 청크가 실시간으로 전달되지 않으므로,
+   *    브라우저에서 Express 백엔드에 직접 요청합니다.
    */
   async stream(
     data: ChatStreamRequest,
@@ -114,8 +112,14 @@ export const chatStreamApi = {
       onEvent: (event: StreamEvent) => void;
     },
   ): Promise<void> {
-    const base = getBaseUrl();
-    const res = await fetch(`${base}/v1/chat/completions`, {
+    // SSE 스트리밍은 Next.js 프록시 우회 → Express 백엔드 직접 호출
+    const streamBase =
+      typeof window === "undefined"
+        ? (process.env.BACKEND_URL ?? "http://localhost:4000")
+        : (process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000");
+    const url = `${streamBase}/v1/chat/completions`;
+    console.log("[stream] fetching:", url);
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -125,6 +129,14 @@ export const chatStreamApi = {
       }),
       signal: options.signal,
     });
+    console.log(
+      "[stream] response status:",
+      res.status,
+      "ok:",
+      res.ok,
+      "body:",
+      !!res.body,
+    );
 
     if (!res.ok) {
       const errorText = await res.text().catch(() => "Unknown error");
@@ -139,11 +151,19 @@ export const chatStreamApi = {
     const decoder = new TextDecoder();
     let buffer = "";
 
+    let chunkCount = 0;
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log("[stream] reader done. total chunks:", chunkCount);
+        break;
+      }
+      chunkCount++;
 
-      buffer += decoder.decode(value, { stream: true });
+      const text = decoder.decode(value, { stream: true });
+      buffer += text;
+      if (chunkCount <= 3)
+        console.log("[stream] chunk", chunkCount, "raw:", text.slice(0, 200));
 
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -182,6 +202,12 @@ export const chatStreamApi = {
           // 파싱 실패 시 무시
         }
       }
+    }
+
+    // signal이 abort된 경우 AbortError를 throw하여
+    // 호출측에서 abort 처리를 할 수 있도록 함
+    if (options.signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
     }
 
     options.onEvent({ type: "done" });

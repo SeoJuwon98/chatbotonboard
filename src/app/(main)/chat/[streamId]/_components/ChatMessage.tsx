@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, BrainCircuit } from "lucide-react";
-import type { Message, ImageAttachment } from "../types";
+import type { DisplayMessage } from "../_lib/message-utils";
 
 interface ChatMessageProps {
-  message: Message;
+  message: DisplayMessage;
 }
 
 function ChatMessage({ message }: ChatMessageProps) {
@@ -23,7 +23,7 @@ function ChatMessage({ message }: ChatMessageProps) {
         {/* User 메시지에 첨부된 이미지 */}
         {isUser && message.images && message.images.length > 0 && (
           <div className="flex gap-2 flex-wrap justify-end">
-            {message.images.map((img: ImageAttachment, i: number) => (
+            {message.images.map((img, i) => (
               <div
                 key={i}
                 className="rounded-lg overflow-hidden border border-gray-200 size-16 shrink-0"

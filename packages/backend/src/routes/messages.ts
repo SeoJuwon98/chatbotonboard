@@ -56,7 +56,9 @@ messagesRouter.post("/:streamId/messages", async (req, res) => {
         role: body.role,
         content: body.content,
         reasoningContent: body.reasoningContent ?? null,
-        images: body.images ? JSON.parse(JSON.stringify(body.images)) : undefined,
+        images: body.images
+          ? JSON.parse(JSON.stringify(body.images))
+          : undefined,
         orderIndex: nextOrder,
       },
     });

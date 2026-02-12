@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import { sessionsRouter } from "./routes/sessions.js";
 import { messagesRouter } from "./routes/messages.js";
-import { v1ChatRouter } from "./routes/v1-chat.js";
+import chatStreamRouter from "./routes/chat-stream.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -13,7 +13,7 @@ app.use(express.json({ limit: "50mb" }));
 
 // ─── Routes ───
 app.use("/sessions", sessionsRouter);
-app.use("/v1", v1ChatRouter);
+app.use("/v1", chatStreamRouter);
 app.use("/chat", messagesRouter);
 
 // ─── Health check ───

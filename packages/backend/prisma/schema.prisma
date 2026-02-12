@@ -10,7 +10,7 @@ datasource db {
 model ChatSession {
   id        String    @id @default(uuid())
   title     String    @default("새로운 채팅")
-  model     String    @default("GPT-OSS-120B")
+  model     String    @default("vllm-main")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]

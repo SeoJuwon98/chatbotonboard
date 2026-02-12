@@ -28,7 +28,7 @@ const initialState = {
   reasoningContent: "",
   error: null,
   abortController: null,
-  model: "GPT-OSS-120B" as ChatModelId,
+  model: "vllm-main" as ChatModelId,
 };
 
 export const useChatStreamStore = create<ChatStreamState>((set, get) => ({

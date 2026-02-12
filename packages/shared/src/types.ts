@@ -1,14 +1,11 @@
 // ─── Chat Model ───
 
-export const CHAT_MODELS = [
-  "GPT-OSS-120B",
-  "QWEN3-VL-8B-INSTRUCT",
-] as const;
+export const CHAT_MODELS = ["vllm-main", "vl-main"] as const;
 
 export type ChatModelId = (typeof CHAT_MODELS)[number];
 
 /** Vision-Language 모델 목록 */
-export const VL_MODEL_IDS: ChatModelId[] = ["QWEN3-VL-8B-INSTRUCT"];
+export const VL_MODEL_IDS: ChatModelId[] = ["vl-main"];
 
 // ─── Image ───
 

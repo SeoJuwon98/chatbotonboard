@@ -37,7 +37,7 @@ interface InputAreaProps {
   onModelChange?: (model: ChatModelId) => void;
 }
 
-const defaultModel: ChatModelId = "GPT-OSS-120B";
+const defaultModel: ChatModelId = "vllm-main";
 
 const InputArea = ({
   placeholder = "메시지를 입력하세요",
